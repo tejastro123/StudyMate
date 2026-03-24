@@ -7,6 +7,11 @@ from models.focus_session import FocusSession, DailyFocusStat
 
 class FocusRepository(BaseRepository[FocusSession]):
 
+    def record(
+        self, subject: str, duration_minutes: int, session_type: str, completed: bool = True
+    ) -> FocusSession:
+        return self.record_session(subject, duration_minutes, session_type, completed)
+
     def record_session(
         self, subject: str, duration_minutes: int, session_type: str, completed: bool = True
     ) -> FocusSession:

@@ -40,6 +40,8 @@ class ChatRepository(BaseRepository[ChatSession]):
             title=row["title"] or "New Chat",
             created_at=row["created_at"] or "",
             remote_id=row["remote_id"] or "",
+            is_dirty=row["is_dirty"],
+            updated_at=row["updated_at"] or "",
         )
 
     @staticmethod
@@ -51,6 +53,8 @@ class ChatRepository(BaseRepository[ChatSession]):
             content=row["content"],
             timestamp=row["timestamp"] or "",
             remote_id=row["remote_id"] or "",
+            is_dirty=row["is_dirty"],
+            updated_at=row["updated_at"] or "",
         )
 
     # ── Messages ─────────────────────────────────────────────────────────────
@@ -64,7 +68,7 @@ class ChatRepository(BaseRepository[ChatSession]):
         conn.close()
         return [self._row_to_message(r) for r in rows]
 
-    def add_message(self, session_id: int, role: str, content: str) -> ChatMessage:
+    def save_message(self, session_id: int, role: str, content: str) -> ChatMessage:
         conn = self._conn()
         cur = conn.execute(
             "INSERT INTO chat_messages (session_id, role, content, is_dirty) VALUES (?, ?, ?, 1)",

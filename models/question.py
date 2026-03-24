@@ -21,6 +21,8 @@ class Question:
     explanation: str = ""
     created_at: str = ""
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
     def __post_init__(self) -> None:
         if not self.question_text.strip():

@@ -11,6 +11,8 @@ class Quiz:
     subject: str = ""
     created_at: str = ""
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
     # Populated by JOIN
     question_count: int = 0

@@ -21,6 +21,8 @@ class TimetableEvent:
     specific_date: str = ""   # "YYYY-MM-DD" for non-recurring events
     created_at: str = ""
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
     def __post_init__(self) -> None:
         if not self.title.strip():

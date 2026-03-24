@@ -34,6 +34,9 @@ _DDL_STATEMENTS = [
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         name        TEXT NOT NULL,
         subject     TEXT,
+        remote_id   TEXT UNIQUE,
+        is_dirty    INTEGER DEFAULT 0,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -48,6 +51,9 @@ _DDL_STATEMENTS = [
         interval_days  INTEGER DEFAULT 1,
         due_date       DATE,
         review_count   INTEGER DEFAULT 0,
+        remote_id      TEXT UNIQUE,
+        is_dirty       INTEGER DEFAULT 0,
+        updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -57,6 +63,9 @@ _DDL_STATEMENTS = [
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         title      TEXT NOT NULL,
         subject    TEXT,
+        remote_id  TEXT UNIQUE,
+        is_dirty   INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -72,6 +81,9 @@ _DDL_STATEMENTS = [
         option_d       TEXT,
         correct_answer TEXT NOT NULL,
         explanation    TEXT,
+        remote_id      TEXT UNIQUE,
+        is_dirty       INTEGER DEFAULT 0,
+        updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -83,6 +95,9 @@ _DDL_STATEMENTS = [
         total        INTEGER,
         pct          INTEGER DEFAULT 0,
         time_seconds INTEGER DEFAULT 0,
+        remote_id    TEXT UNIQUE,
+        is_dirty     INTEGER DEFAULT 0,
+        updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -99,6 +114,9 @@ _DDL_STATEMENTS = [
         color         TEXT DEFAULT '#6C63FF',
         is_recurring  INTEGER DEFAULT 0,
         specific_date DATE,
+        remote_id     TEXT UNIQUE,
+        is_dirty      INTEGER DEFAULT 0,
+        updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -110,6 +128,9 @@ _DDL_STATEMENTS = [
         duration_minutes INTEGER,
         session_type     TEXT,
         completed        INTEGER DEFAULT 1,
+        remote_id        TEXT UNIQUE,
+        is_dirty         INTEGER DEFAULT 0,
+        updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         started_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -118,6 +139,9 @@ _DDL_STATEMENTS = [
     CREATE TABLE IF NOT EXISTS chat_sessions (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         title      TEXT,
+        remote_id  TEXT UNIQUE,
+        is_dirty   INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -127,6 +151,9 @@ _DDL_STATEMENTS = [
         session_id INTEGER REFERENCES chat_sessions(id) ON DELETE CASCADE,
         role       TEXT,
         content    TEXT,
+        remote_id  TEXT UNIQUE,
+        is_dirty   INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         timestamp  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -145,7 +172,10 @@ _DDL_STATEMENTS = [
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         date        DATE UNIQUE NOT NULL,
         xp          INTEGER DEFAULT 0,
-        streak_days INTEGER DEFAULT 0
+        streak_days INTEGER DEFAULT 0,
+        remote_id   TEXT UNIQUE,
+        is_dirty    INTEGER DEFAULT 0,
+        updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
 ]

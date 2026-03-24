@@ -15,6 +15,8 @@ class FocusSession:
     completed: bool = True
     started_at: str = ""     # ISO datetime string
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
     def __post_init__(self) -> None:
         if self.duration_minutes < 1:

@@ -12,6 +12,8 @@ class ChatSession:
     title: str = "New Chat"
     created_at: str = ""
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
 
 @dataclass
@@ -23,6 +25,8 @@ class ChatMessage:
     content: str
     timestamp: str = ""
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
 
     def __post_init__(self) -> None:
         if self.role not in VALID_ROLES:

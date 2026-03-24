@@ -109,9 +109,10 @@ class StatsRepository(BaseRepository[StudyActivity]):
 
     def create(self, activity_date: date, xp: int, streak_days: int, remote_id: str = "", is_dirty: bool = True) -> StudyActivity:
         conn = self._conn()
+        r_id = remote_id if remote_id else None
         cur = conn.execute(
             "INSERT INTO study_activity (date, xp, streak_days, remote_id, is_dirty) VALUES (?, ?, ?, ?, ?)",
-            (activity_date.isoformat(), xp, streak_days, remote_id, int(is_dirty)),
+            (activity_date.isoformat(), xp, streak_days, r_id, int(is_dirty)),
         )
         act_id = cur.lastrowid
         conn.commit()

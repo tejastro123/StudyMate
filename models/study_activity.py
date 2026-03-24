@@ -13,3 +13,5 @@ class StudyActivity:
     xp: int
     streak_days: int
     remote_id: str = ""
+    is_dirty: int = 0
+    updated_at: str = ""
