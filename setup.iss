@@ -1,6 +1,6 @@
 [Setup]
 AppName=StudyMate
-AppVersion=1.0.0
+AppVersion=1.1.0
 DefaultDirName={autopf}\StudyMate
 DefaultGroupName=StudyMate
 UninstallDisplayIcon={app}\StudyMate.exe
