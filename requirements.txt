@@ -10,7 +10,6 @@ supabase
 python-dotenv
 icalendar
 markdown
-PyQt6-QtMultimedia
 # Core Supabase components (for sync_service.py)
 gotrue
 postgrest
