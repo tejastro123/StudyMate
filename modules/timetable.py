@@ -15,7 +15,7 @@ _svc = TimetableService(TimetableRepository(get_connection))
 
 
 def get_all_events() -> list[dict]:
-    return [e.__dict__ for e in _svc.get_all_events()]
+    return [e.__dict__ for e in _svc.get_all()]
 
 
 def get_events_for_day(day_of_week: int) -> list[dict]:
@@ -40,7 +40,7 @@ def get_events_for_day(day_of_week: int) -> list[dict]:
 
 
 def get_todays_events() -> list[dict]:
-    return [e.__dict__ for e in _svc.get_todays_events()]
+    return [e.__dict__ for e in _svc.get_today()]
 
 
 def add_event(
@@ -54,9 +54,10 @@ def add_event(
     is_recurring: int = 0,
     specific_date: str = "",
 ) -> int:
-    event = _svc.add_event(
-        title, subject, event_type, day_of_week, start_time, end_time,
-        color, bool(is_recurring), specific_date or None
+    event = _svc.add(
+        title=title, subject=subject, event_type=event_type, 
+        day_of_week=day_of_week, start_time=start_time, end_time=end_time,
+        color=color, is_recurring=bool(is_recurring), specific_date=specific_date or ""
     )
     return event.id
 
@@ -73,15 +74,16 @@ def update_event(
     is_recurring: int,
     specific_date: str,
 ) -> None:
-    _svc.update_event(
-        event_id, title, subject, event_type, day_of_week, start_time, end_time,
-        color, bool(is_recurring), specific_date or None
+    _svc.update(
+        event_id=event_id, title=title, subject=subject, event_type=event_type, 
+        day_of_week=day_of_week, start_time=start_time, end_time=end_time,
+        color=color, is_recurring=bool(is_recurring), specific_date=specific_date or ""
     )
 
 
 def delete_event(event_id: int) -> None:
-    _svc.delete_event(event_id)
+    _svc.delete(event_id)
 
 
 def get_upcoming_events(window_minutes: int = 10) -> list[dict]:
-    return [e.__dict__ for e in _svc.get_upcoming_events(window_minutes)]
+    return [e.__dict__ for e in _svc.get_upcoming(window_minutes)]
