@@ -1,0 +1,7 @@
+# requirements-dev.txt — Development and testing dependencies
+# Install with: pip install -r requirements-dev.txt
+
+pytest>=7.4
+pytest-cov>=4.1
+pytest-mock>=3.11
+keyring>=24.0
