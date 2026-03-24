@@ -10,7 +10,7 @@ import uuid
 import threading
 import time
 from typing import Optional, Dict, Any
-from gotrue import SyncClient as AuthClient
+from gotrue import SyncGoTrueClient as AuthClient
 from postgrest import SyncPostgrestClient as DBClient
 import keyring
 
