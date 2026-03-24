@@ -16,6 +16,7 @@ import re
 from repository.chat_repo import ChatRepository
 from models.chat import ChatSession, ChatMessage
 from database.db import log_activity
+from .ollama_service import OllamaService
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,9 @@ SYSTEM_PROMPT = (
 
 class AIService:
 
-    def __init__(self, repo: ChatRepository) -> None:
+    def __init__(self, repo: ChatRepository, ollama: Optional[OllamaService] = None) -> None:
         self._repo = repo
+        self._ollama = ollama or OllamaService()
 
     # ── Sessions ─────────────────────────────────────────────────────────────
 
@@ -57,6 +59,8 @@ class AIService:
         session_id: int,
         user_text: str,
         history: list[ChatMessage],
+        provider: str = "anthropic",
+        local_model: str = "llama3"
     ) -> str:
         """
         Send a message to Claude and return the assistant reply.
@@ -65,19 +69,24 @@ class AIService:
 
         Raises anthropic.APIError on network / auth failures.
         """
-        import anthropic
+        if provider == "anthropic":
+            import anthropic
+            messages = [{"role": m.role, "content": m.content} for m in history]
+            messages.append({"role": "user", "content": user_text})
 
-        messages = [{"role": m.role, "content": m.content} for m in history]
-        messages.append({"role": "user", "content": user_text})
-
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=messages,
-        )
-        reply = response.content[0].text
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-3-5-haiku-20241022",
+                max_tokens=1024,
+                system=SYSTEM_PROMPT,
+                messages=messages,
+            )
+            reply = response.content[0].text
+        else:
+            # Ollama / Local
+            messages = [{"role": m.role, "content": m.content} for m in history]
+            messages.append({"role": "user", "content": user_text})
+            reply = self._ollama.chat(model=local_model, messages=messages, system=SYSTEM_PROMPT)
 
         # Persist both turns
         self._repo.save_message(session_id, "user", user_text)
@@ -124,7 +133,7 @@ class AIService:
             raise ValueError(f"Could not read PDF file: {e}")
         return "\n".join(text_blocks)
 
-    def generate_deck_from_text(self, api_key: str, text: str, max_cards: int = 15) -> list[dict[str, str]]:
+    def generate_deck_from_text(self, api_key: str, text: str, max_cards: int = 15, provider: str = "anthropic", local_model: str = "llama3") -> list[dict[str, str]]:
         """
         Send document text to Claude and ask it to generate a Quiz/Flashcard deck.
         Returns a list of dictionaries with 'front' and 'back' keys.
@@ -140,17 +149,24 @@ class AIService:
             "Each object must have exactly two string keys: 'front' and 'back'.\n"
             "Example: [{\"front\": \"What is mitochondria?\", \"back\": \"Powerhouse of the cell\"}]"
         )
+        if provider == "anthropic":
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-3-5-haiku-20241022",
+                max_tokens=2048,
+                system=gen_prompt,
+                messages=[{"role": "user", "content": f"Document text:\n\n{text[:40000]}"}], # truncate if too huge
+            )
+            reply = response.content[0].text.strip()
+        else:
+            # Ollama / Local
+            reply = self._ollama.generate(
+                model=local_model,
+                prompt=f"Document text:\n\n{text[:40000]}",
+                system=gen_prompt
+            ).strip()
 
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=2048,
-            system=gen_prompt,
-            messages=[{"role": "user", "content": f"Document text:\n\n{text[:40000]}"}], # truncate if too huge
-        )
-
-        reply = response.content[0].text.strip()
-        
         # Strip potential markdown formatting if Claude disobeys
         if reply.startswith("```json"):
             reply = reply[7:]

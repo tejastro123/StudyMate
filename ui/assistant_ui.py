@@ -35,17 +35,20 @@ class AIWorker(QThread):
     result = pyqtSignal(str)
     error = pyqtSignal(str)
 
-    def __init__(self, api_key: str, session_id: int, user_text: str, history: list[dict]):
+    def __init__(self, api_key: str, session_id: int, user_text: str, history: list[dict], provider: str = "anthropic", local_model: str = "llama3"):
         super().__init__()
         self._api_key = api_key
         self._session_id = session_id
         self._user_text = user_text
         self._history = history
+        self._provider = provider
+        self._local_model = local_model
 
     def run(self):
         try:
             reply = ai_logic.send_message(
-                self._api_key, self._session_id, self._user_text, self._history
+                self._api_key, self._session_id, self._user_text, self._history,
+                provider=self._provider, local_model=self._local_model
             )
             self.result.emit(reply)
         except Exception as exc:
@@ -216,14 +219,26 @@ class AssistantPage(QWidget):
         title = QLabel("🤖  AI Study Assistant")
         title.setObjectName("pageTitle")
         hdr.addWidget(title)
+
+        self._provider_badge = QLabel("Cloud ☁️")
+        self._provider_badge.setStyleSheet(
+            "background-color: #35355A; color: #8BE9FD; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;"
+        )
+        hdr.addWidget(self._provider_badge)
+        hdr.addStretch()
         right_layout.addLayout(hdr)
 
-        # API key warning
+        # Provider warning
         self._api_warning = QLabel(
             "⚠️  No API key configured. Go to Settings to add your Anthropic API key."
         )
         self._api_warning.setStyleSheet("color: #FFB86C; font-size: 12px; padding: 6px;")
-        self._api_warning.setVisible(not bool(self._cfg.get("api_key")))
+        
+        provider = self._cfg.get("ai_provider", "anthropic")
+        api_key = self._cfg.get("api_key")
+        
+        self._api_warning.setVisible(provider == "anthropic" and not api_key)
+        self._update_badge(provider)
         right_layout.addWidget(self._api_warning)
 
         # Quick actions
@@ -336,7 +351,20 @@ class AssistantPage(QWidget):
         self._history = []
         self._chat_area.clear_messages()
         self._load_sessions()
+        self._load_sessions()
         self._new_session()
+
+    def _update_badge(self, provider: str):
+        if provider == "ollama":
+            self._provider_badge.setText("Local 🏠")
+            self._provider_badge.setStyleSheet(
+                "background-color: #3730A3; color: #50FA7B; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;"
+            )
+        else:
+            self._provider_badge.setText("Cloud ☁️")
+            self._provider_badge.setStyleSheet(
+                "background-color: #35355A; color: #8BE9FD; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;"
+            )
 
     # ──────────────────────────────────────────────── Messaging ──
     def _get_clipboard_prefix(self) -> str:
@@ -378,9 +406,14 @@ class AssistantPage(QWidget):
         text = self._input.toPlainText().strip()
         if not text:
             return
-        if not self._cfg.get("api_key"):
+        provider = self._cfg.get("ai_provider", "anthropic")
+        api_key = self._cfg.get("api_key")
+
+        if provider == "anthropic" and not api_key:
             self._api_warning.setVisible(True)
             return
+        
+        self._update_badge(provider)
 
         self._input.clear()
         self._chat_area.add_message("user", text)
@@ -391,7 +424,9 @@ class AssistantPage(QWidget):
             self._load_sessions()
 
         self._worker = AIWorker(
-            self._cfg["api_key"], self._session_id, text, list(self._history)
+            api_key or "", self._session_id, text, list(self._history),
+            provider=provider,
+            local_model=self._cfg.get("ollama_model", "llama3")
         )
         self._worker.result.connect(self._on_ai_reply)
         self._worker.error.connect(self._on_ai_error)

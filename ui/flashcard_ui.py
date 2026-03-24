@@ -380,8 +380,9 @@ class StudyModeWidget(QWidget):
 class FlashcardPage(QWidget):
     """Main Flashcards page with deck list and card management."""
 
-    def __init__(self):
+    def __init__(self, cfg: dict = None):
         super().__init__()
+        self._cfg = cfg or {}
         self._selected_deck_id: int | None = None
         self._cards: list[dict] = []
         self._study_widget: StudyModeWidget | None = None
@@ -541,8 +542,11 @@ class FlashcardPage(QWidget):
         import keyring
         import modules.ai_assistant as ai_logic
 
-        api_key = keyring.get_password("StudyMate", "anthropic_api_key")
-        if not api_key:
+        api_key = self._cfg.get("api_key")
+        provider = self._cfg.get("ai_provider", "anthropic")
+        local_model = self._cfg.get("ollama_model", "llama3")
+
+        if provider == "anthropic" and not api_key:
             QMessageBox.warning(self, "No API Key", "Please set your Anthropic API key in Settings first.")
             return
 
@@ -560,8 +564,11 @@ class FlashcardPage(QWidget):
             QApplication.processEvents()
             text = ai_logic.extract_text_from_pdf(path)
             
-            # Request deck from Claude
-            cards = ai_logic.generate_deck_from_text(api_key, text, max_cards=15)
+            # Request deck from Claude or Ollama
+            cards = ai_logic.generate_deck_from_text(
+                api_key, text, max_cards=15, 
+                provider=provider, local_model=local_model
+            )
             
             # Create the deck and add cards
             QApplication.restoreOverrideCursor()

@@ -32,20 +32,3 @@ class BaseRepository(ABC, Generic[T]):
         conn = self._conn_factory()
         conn.row_factory = sqlite3.Row
         return conn
-
-    def mark_dirty(self, table: str, local_id: int):
-        """Mark a row as dirty so the sync service knows to push it."""
-        conn = self._conn()
-        conn.execute(
-            f"UPDATE {table} SET is_dirty = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (local_id,)
-        )
-        conn.commit()
-        conn.close()
-
-    def get_by_remote_id(self, table: str, remote_id: str) -> Optional[dict]:
-        """Fetch a single row by its remote UUID."""
-        conn = self._conn()
-        row = conn.execute(f"SELECT * FROM {table} WHERE remote_id = ?", (remote_id,)).fetchone()
-        conn.close()
-        return dict(row) if row else None

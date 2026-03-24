@@ -61,7 +61,7 @@ class SettingsPage(QScrollArea):
         layout.addWidget(title)
 
         layout.addWidget(self._build_api_section())
-        layout.addWidget(self._build_cloud_section()) # NEW
+        layout.addWidget(self._build_ollama_section()) # NEW Phase 5
         layout.addWidget(self._build_theme_section())
         layout.addWidget(self._build_pomodoro_section())
         layout.addWidget(self._build_notifications_section())
@@ -196,6 +196,47 @@ class SettingsPage(QScrollArea):
         lay.addWidget(clear_btn)
         return frame
 
+    def _build_ollama_section(self) -> QFrame:
+        """Ollama Local AI configuration."""
+        frame, lay = self._card("🏠 Local AI (Ollama)")
+        
+        lbl = QLabel("Run AI features entirely on your machine. No API key required.")
+        lbl.setObjectName("mutedLabel")
+        lay.addWidget(lbl)
+
+        # Provider Toggle
+        pref_row = QHBoxLayout()
+        pref_row.addWidget(QLabel("Current Provider:"))
+        self._provider_combo = QComboBox()
+        self._provider_combo.addItems(["Anthropic Claude", "Local Ollama"])
+        is_ollama = self._cfg.get("ai_provider") == "ollama"
+        self._provider_combo.setCurrentIndex(1 if is_ollama else 0)
+        self._provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        pref_row.addWidget(self._provider_combo)
+        lay.addLayout(pref_row)
+
+        # Model Selection
+        model_row = QHBoxLayout()
+        model_row.addWidget(QLabel("Ollama Model:   "))
+        self._ollama_model_input = QLineEdit(self._cfg.get("ollama_model", "llama3"))
+        self._ollama_model_input.setPlaceholderText("llama3, mistral, phi3...")
+        model_row.addWidget(self._ollama_model_input)
+        lay.addLayout(model_row)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        check_btn = QPushButton("🔌 Check Connection")
+        check_btn.clicked.connect(self._on_check_ollama)
+        btn_row.addWidget(check_btn)
+        
+        pull_btn = QPushButton("📥 Pull Model")
+        pull_btn.setObjectName("secondaryBtn")
+        pull_btn.clicked.connect(self._on_pull_ollama)
+        btn_row.addWidget(pull_btn)
+        lay.addLayout(btn_row)
+
+        return frame
+
     def _build_cloud_section(self) -> QFrame:
         """Supabase Cloud Sync configuration."""
         frame, lay = self._card("☁️  Cloud Sync (Supabase)")
@@ -217,29 +258,6 @@ class SettingsPage(QScrollArea):
         key_row = QHBoxLayout()
         key_row.addWidget(QLabel("Anon Key:   "))
         self._sb_key = QLineEdit(self._cfg.get("supabase_key", ""))
-        self._sb_key.setEchoMode(QLineEdit.EchoMode.Password)
-        key_row.addWidget(self._sb_key)
-        lay.addLayout(key_row)
-
-        # Auth
-        self._auth_status = QLabel("Status: Not Logged In")
-        if sync_manager.is_logged_in():
-             self._auth_status.setText(f"Status: Logged In as {sync_manager._user_id[:8]}...")
-        lay.addWidget(self._auth_status)
-
-        btn_row = QHBoxLayout()
-        self._login_btn = QPushButton("🔑 Login / Connect")
-        self._login_btn.clicked.connect(self._on_cloud_login)
-        btn_row.addWidget(self._login_btn)
-
-        self._sync_now_btn = QPushButton("🔄 Sync Now")
-        self._sync_now_btn.setEnabled(sync_manager.is_logged_in())
-        self._sync_now_btn.clicked.connect(self._on_sync_now)
-        btn_row.addWidget(self._sync_now_btn)
-        
-        lay.addLayout(btn_row)
-        return frame
-
     def _build_about_section(self) -> QFrame:
         frame, lay = self._card("ℹ️ About")
         lay.addWidget(QLabel("StudyMate v1.0.0"))
@@ -310,23 +328,6 @@ class SettingsPage(QScrollArea):
         except Exception as exc:
             QMessageBox.critical(self, "Import Error", str(exc))
 
-    def _on_cloud_login(self):
-        url = self._sb_url.text().strip()
-        key = self._sb_key.text().strip()
-        if not url or not key:
-            QMessageBox.warning(self, "Error", "Please enter both Supabase URL and Key.")
-            return
-        
-        from services.sync_service import sync_manager
-        sync_manager.configure(url, key)
-        
-        import login_dialog # I might need to create a small dialog for email/pass
-        # For now, let's assume I create a simple input
-        from PyQt6.QtWidgets import QInputDialog
-        email, ok1 = QInputDialog.getText(self, "Login", "Email:")
-        if not ok1 or not email: return
-        password, ok2 = QInputDialog.getText(self, "Login", "Password:", QLineEdit.EchoMode.Password)
-        if not ok2 or not password: return
         
         if sync_manager.login(email, password):
             self._cfg["supabase_url"] = url
@@ -402,3 +403,33 @@ class SettingsPage(QScrollArea):
             QMessageBox.information(self, "Cleared", "All data has been deleted. The app will continue running with an empty database.")
         except Exception as exc:
             QMessageBox.critical(self, "Error", str(exc))
+
+    def _on_provider_changed(self, index: int):
+        provider = "ollama" if index == 1 else "anthropic"
+        self._cfg["ai_provider"] = provider
+        if self._save_config:
+            self._save_config(self._cfg)
+        logger.info(f"AI Provider switched to {provider}")
+
+    def _on_check_ollama(self):
+        from services.ollama_service import OllamaService
+        svc = OllamaService()
+        if svc.is_available():
+            models = svc.get_local_models()
+            model_str = ", ".join(models[:3]) + ("..." if len(models) > 3 else "")
+            QMessageBox.information(self, "Connection OK", f"Ollama is running!\n\nLocal models: {model_str}")
+        else:
+            QMessageBox.critical(self, "Connection Failed", "Could not connect to Ollama at http://localhost:11434.\n\nPlease ensure Ollama is installed and running.")
+
+    def _on_pull_ollama(self):
+        model = self._ollama_model_input.text().strip()
+        if not model: return
+        self._cfg["ollama_model"] = model
+        if self._save_config: self._save_config(self._cfg)
+        
+        from services.ollama_service import OllamaService
+        svc = OllamaService()
+        if svc.pull_model(model):
+            QMessageBox.information(self, "Downloading", f"Started pulling model '{model}'.\n\nPlease check your Ollama terminal for progress.")
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to start pulling model '{model}'.")

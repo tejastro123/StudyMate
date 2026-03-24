@@ -44,6 +44,8 @@ DEFAULT_CONFIG = {
     "pomodoro_short_break": 5,
     "pomodoro_long_break": 15,
     "notifications_enabled": True,
+    "ai_provider": "ollama",
+    "ollama_model": "llama3",
     # NOTE: api_key is stored in the OS keyring, NOT in this dict.
 }
 
@@ -134,14 +136,6 @@ def main():
     # ── Config ─────────────────────────────────────────────────────────
     cfg = load_config()
 
-    # ── Cloud Sync ─────────────────────────────────────────────────────
-    from services.sync_service import sync_manager
-    sb_url = cfg.get("supabase_url")
-    sb_key = cfg.get("supabase_key")
-    if sb_url and sb_key:
-        sync_manager.configure(sb_url, sb_key)
-        sync_manager.try_restore_session()
-
     # ── Qt Application ─────────────────────────────────────────────────
     app = QApplication(sys.argv)
     app.setApplicationName("StudyMate")
@@ -168,7 +162,7 @@ def main():
     from ui.settings_ui import SettingsPage
 
     dashboard = DashboardPage(navigate_fn=window.navigate_to)
-    flashcards = FlashcardPage()
+    flashcards = FlashcardPage(cfg=cfg)
     quizzes = QuizPage()
     timetable = TimetablePage()
     timer = TimerPage(cfg=cfg, save_config_fn=save_config)

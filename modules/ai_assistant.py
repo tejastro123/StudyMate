@@ -40,13 +40,15 @@ def send_message(
     session_id: int,
     user_text: str,
     conversation_history: list[dict],
+    provider: str = "anthropic",
+    local_model: str = "llama3"
 ) -> str:
     from models.chat import ChatMessage
     history = [
         ChatMessage(id=0, session_id=session_id, role=m["role"], content=m["content"])
         for m in conversation_history
     ]
-    return _svc.send(api_key, session_id, user_text, history)
+    return _svc.send(api_key, session_id, user_text, history, provider=provider, local_model=local_model)
 
 def markdown_to_html(text: str) -> str:
     return AIService.markdown_to_html(text)
@@ -54,5 +56,5 @@ def markdown_to_html(text: str) -> str:
 def extract_text_from_pdf(pdf_path: str) -> str:
     return AIService.extract_text_from_pdf(pdf_path)
 
-def generate_deck_from_text(api_key: str, text: str, max_cards: int = 15) -> list[dict[str, str]]:
-    return _svc.generate_deck_from_text(api_key, text, max_cards)
+def generate_deck_from_text(api_key: str, text: str, max_cards: int = 15, provider: str = "anthropic", local_model: str = "llama3") -> list[dict[str, str]]:
+    return _svc.generate_deck_from_text(api_key, text, max_cards, provider=provider, local_model=local_model)
