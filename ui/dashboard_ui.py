@@ -19,10 +19,12 @@ from PyQt6.QtWidgets import (
     QPushButton, QScrollArea, QFrame, QGridLayout,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QTimer
+from datetime import date, timedelta
 
 from database.db import get_connection
+import modules.stats as stats_logic
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +129,7 @@ class DashboardPage(QScrollArea):
 
         self._build_header()
         self._build_stats()
-        self._build_quote()
+        self._build_xp_chart()
         self._build_quick_access()
         self._build_activity()
 
@@ -165,29 +167,31 @@ class DashboardPage(QScrollArea):
         self._card_quizzes = StatCard("📝", "0", "Quizzes Today", "#50FA7B")
         self._card_events = StatCard("📅", "0", "Events Today", "#FFB86C")
         self._card_focus = StatCard("⏱️", "0m", "Focus Time Today", "#FF79C6")
+        self._card_xp = StatCard("⭐", "0", "Today's XP", "#F1FA8C")
+        self._card_streak = StatCard("🔥", "0", "Current Streak", "#FF5555")
 
         grid.addWidget(self._card_decks, 0, 0)
         grid.addWidget(self._card_quizzes, 0, 1)
         grid.addWidget(self._card_events, 0, 2)
-        grid.addWidget(self._card_focus, 0, 3)
+        grid.addWidget(self._card_focus, 1, 0)
+        grid.addWidget(self._card_xp, 1, 1)
+        grid.addWidget(self._card_streak, 1, 2)
 
         self._layout.addLayout(grid)
 
-    def _build_quote(self):
+    def _build_xp_chart(self):
         frame = QFrame()
         frame.setObjectName("card")
         fl = QVBoxLayout(frame)
         fl.setContentsMargins(20, 16, 20, 16)
 
-        header = QLabel("💡  Daily Motivation")
+        header = QLabel("📊  7-Day Study Activity (XP)")
         header.setObjectName("sectionTitle")
         fl.addWidget(header)
 
-        self._quote_lbl = QLabel(random.choice(QUOTES))
-        self._quote_lbl.setWordWrap(True)
-        self._quote_lbl.setFont(QFont("Segoe UI", 14, QFont.Weight.Medium))
-        self._quote_lbl.setStyleSheet("color: #C0C0D8; font-style: italic;")
-        fl.addWidget(self._quote_lbl)
+        self._chart_layout = QHBoxLayout()
+        self._chart_layout.setSpacing(12)
+        fl.addLayout(self._chart_layout)
 
         self._layout.addWidget(frame)
 
@@ -280,6 +284,73 @@ class DashboardPage(QScrollArea):
             self._card_focus.set_value(f"{mins}m")
 
         conn.close()
+
+        # Gamification Stats
+        today_stats = stats_logic.get_today()
+        self._card_xp.set_value(str(today_stats.get("xp", 0)))
+        self._card_streak.set_value(str(today_stats.get("streak_days", 0)))
+        
+        # Render XP Bar Chart
+        self._render_xp_chart()
+
+    def _render_xp_chart(self):
+        # Clear existing bars
+        while self._chart_layout.count():
+            child = self._chart_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+            elif child.layout():
+                while child.layout().count():
+                    c = child.layout().takeAt(0)
+                    if c.widget(): c.widget().deleteLater()
+                child.layout().deleteLater()
+
+        history = stats_logic.get_weekly_history()
+        today = date.today()
+        dates = [today - timedelta(days=i) for i in range(6, -1, -1)]
+        
+        xp_map = {h["activity_date"].isoformat() if isinstance(h["activity_date"], date) else h["activity_date"]: h["xp"] for h in history}
+        
+        # Inject today explicitly if missing from history but has XP
+        today_stat = stats_logic.get_today()
+        td_str = today.isoformat()
+        if td_str not in xp_map:
+            xp_map[td_str] = today_stat.get("xp", 0)
+
+        max_xp = max(xp_map.values()) if xp_map else 0
+        if max_xp < 50:
+            max_xp = 50  # Visual baseline
+
+        for d in dates:
+            d_str = d.isoformat()
+            xp = xp_map.get(d_str, 0)
+            
+            col = QVBoxLayout()
+            col.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+            
+            xp_lbl = QLabel(str(xp))
+            xp_lbl.setObjectName("mutedLabel")
+            xp_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            col.addWidget(xp_lbl)
+            
+            bar = QFrame()
+            height = int((xp / max_xp) * 120) if max_xp > 0 else 0
+            if height < 4 and xp == 0:
+                height = 4
+                bar.setStyleSheet("background-color: #2A2A3E; border-radius: 4px;")
+            else:
+                if height < 4: height = 4
+                bar.setStyleSheet("background-color: #F1FA8C; border-radius: 4px;")
+                
+            bar.setFixedSize(32, height)
+            col.addWidget(bar, alignment=Qt.AlignmentFlag.AlignHCenter)
+            
+            day_lbl = QLabel(d.strftime("%a"))
+            day_lbl.setObjectName("mutedLabel")
+            day_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            col.addWidget(day_lbl)
+            
+            self._chart_layout.addLayout(col)
 
     def _refresh_activity(self):
         # Clear previous items

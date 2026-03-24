@@ -47,18 +47,18 @@ class FlashcardRepository(BaseRepository[Flashcard]):
     def create(self, deck_id: int, front: str, back: str) -> Flashcard:
         conn = self._conn()
         cur = conn.execute(
-            "INSERT INTO flashcards (deck_id, front, back) VALUES (?, ?, ?)",
+            "INSERT INTO flashcards (deck_id, front, back, is_dirty) VALUES (?, ?, ?, 1)",
             (deck_id, front, back),
         )
         card_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return Flashcard(id=card_id, deck_id=deck_id, front=front, back=back)
+        return Flashcard(id=card_id, deck_id=deck_id, front=front, back=back, is_dirty=1)
 
     def update(self, card_id: int, front: str, back: str) -> None:
         conn = self._conn()
         conn.execute(
-            "UPDATE flashcards SET front = ?, back = ? WHERE id = ?",
+            "UPDATE flashcards SET front = ?, back = ?, is_dirty = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (front, back, card_id),
         )
         conn.commit()
@@ -77,7 +77,8 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             """
             UPDATE flashcards
             SET difficulty = ?, ease_factor = ?, interval_days = ?,
-                due_date = ?, review_count = review_count + 1
+                due_date = ?, review_count = review_count + 1,
+                is_dirty = 1, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
             (difficulty, ease_factor, interval_days, due_date, card_id),
@@ -106,4 +107,5 @@ class FlashcardRepository(BaseRepository[Flashcard]):
             due_date=row["due_date"] or "",
             created_at=row["created_at"] or "",
             review_count=int(row["review_count"] or 0),
+            remote_id=row["remote_id"] or "",
         )

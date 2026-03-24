@@ -139,6 +139,15 @@ _DDL_STATEMENTS = [
         logged_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """,
+    # --- Gamification ---
+    """
+    CREATE TABLE IF NOT EXISTS study_activity (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        date        DATE UNIQUE NOT NULL,
+        xp          INTEGER DEFAULT 0,
+        streak_days INTEGER DEFAULT 0
+    )
+    """,
 ]
 
 def _ensure_db_directory() -> None:

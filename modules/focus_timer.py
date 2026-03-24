@@ -20,6 +20,9 @@ def record_session(
     session = _svc.record_session(
         subject, duration_minutes, session_type, completed=bool(completed)
     )
+    if completed:
+        import modules.stats as stats_logic
+        stats_logic.add_xp(duration_minutes * 2)
     return session.id
 
 

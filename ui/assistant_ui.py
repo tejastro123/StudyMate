@@ -262,6 +262,13 @@ class AssistantPage(QWidget):
         self._input.installEventFilter(self)
         input_row.addWidget(self._input, stretch=1)
 
+        mic_btn = QPushButton("🎤")
+        mic_btn.setObjectName("secondaryBtn")
+        mic_btn.setFixedSize(48, 72)
+        mic_btn.setToolTip("Speak your question (requires microphone)")
+        mic_btn.clicked.connect(self._on_voice_input)
+        input_row.addWidget(mic_btn)
+
         send_btn = QPushButton("Send ➤")
         send_btn.setFixedSize(90, 72)
         send_btn.clicked.connect(self._on_send)
@@ -345,6 +352,27 @@ class AssistantPage(QWidget):
             prompt = prompt_or_fn
         self._input.setPlainText(prompt)
         self._input.setFocus()
+
+    def _on_voice_input(self):
+        """Listen to the user's microphone and fill the input box with the transcription."""
+        from services.audio_service import listen_once, is_stt_available
+        from PyQt6.QtWidgets import QMessageBox
+        if not is_stt_available():
+            QMessageBox.information(
+                self,
+                "Microphone Unavailable",
+                "Speech-to-text requires PyAudio (a system audio library).\n\n"
+                "To enable it, install the Microsoft C++ Build Tools and then run:\n"
+                "  pip install pyaudio",
+            )
+            return
+        # Listen in a background thread to avoid freezing the UI
+        import threading
+        def _listen():
+            result = listen_once(timeout=7)
+            if result:
+                self._input.setPlainText(result)
+        threading.Thread(target=_listen, daemon=True).start()
 
     def _on_send(self):
         text = self._input.toPlainText().strip()

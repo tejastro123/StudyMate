@@ -14,6 +14,7 @@ class FocusSession:
     session_type: str        # 'pomodoro' | 'custom'
     completed: bool = True
     started_at: str = ""     # ISO datetime string
+    remote_id: str = ""
 
     def __post_init__(self) -> None:
         if self.duration_minutes < 1:

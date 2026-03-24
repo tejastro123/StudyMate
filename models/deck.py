@@ -10,6 +10,7 @@ class Deck:
     name: str
     subject: str = ""
     created_at: str = ""
+    remote_id: str = ""
 
     # Computed stats (populated by repository JOIN queries)
     total_cards: int = 0

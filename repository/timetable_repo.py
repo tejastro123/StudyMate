@@ -55,51 +55,42 @@ class TimetableRepository(BaseRepository[TimetableEvent]):
         return [self._row_to_event(r) for r in rows]
 
     def create(
-        self,
-        title: str,
-        subject: str,
-        event_type: str,
-        day_of_week: int,
-        start_time: str,
-        end_time: str,
-        color: str = "#6C63FF",
-        is_recurring: bool = True,
-        specific_date: str = "",
+        self, title: str, subject: str, event_type: str, day_of_week: int,
+        start_time: str, end_time: str, color: str = "#6C63FF",
+        is_recurring: bool = True, specific_date: str = ""
     ) -> TimetableEvent:
         conn = self._conn()
         cur = conn.execute(
             """
-            INSERT INTO timetable_events
-                (title, subject, event_type, day_of_week, start_time, end_time,
-                 color, is_recurring, specific_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO timetable_events (
+                title, subject, event_type, day_of_week, start_time,
+                end_time, color, is_recurring, specific_date, is_dirty
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
-            (title, subject, event_type, day_of_week, start_time, end_time,
-             color, int(is_recurring), specific_date or None),
+            (title, subject, event_type, day_of_week, start_time,
+             end_time, color, int(is_recurring), specific_date)
         )
-        event_id = cur.lastrowid
+        e_id = cur.lastrowid
         conn.commit()
         conn.close()
         return TimetableEvent(
-            id=event_id, title=title, subject=subject, event_type=event_type,
+            id=e_id, title=title, subject=subject, event_type=event_type,
             day_of_week=day_of_week, start_time=start_time, end_time=end_time,
             color=color, is_recurring=is_recurring, specific_date=specific_date,
+            is_dirty=1
         )
 
     def update(self, event_id: int, **kwargs) -> None:
-        fields = {
-            "title", "subject", "event_type", "day_of_week",
-            "start_time", "end_time", "color", "is_recurring", "specific_date",
-        }
-        updates = {k: v for k, v in kwargs.items() if k in fields}
-        if not updates:
+        if not kwargs:
             return
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        fields = ", ".join(f"{k} = ?" for k in kwargs.keys())
+        # Add sync flags
+        fields += ", is_dirty = 1, updated_at = CURRENT_TIMESTAMP"
+        values = list(kwargs.values())
+        values.append(event_id)
+        
         conn = self._conn()
-        conn.execute(
-            f"UPDATE timetable_events SET {set_clause} WHERE id = ?",
-            (*updates.values(), event_id),
-        )
+        conn.execute(f"UPDATE timetable_events SET {fields} WHERE id = ?", values)
         conn.commit()
         conn.close()
 
@@ -115,12 +106,13 @@ class TimetableRepository(BaseRepository[TimetableEvent]):
             id=row["id"],
             title=row["title"],
             subject=row["subject"] or "",
-            event_type=row["event_type"] or "class",
-            day_of_week=int(row["day_of_week"]),
+            event_type=row["event_type"],
+            day_of_week=row["day_of_week"],
             start_time=row["start_time"],
             end_time=row["end_time"],
             color=row["color"] or "#6C63FF",
             is_recurring=bool(row["is_recurring"]),
             specific_date=row["specific_date"] or "",
             created_at=row["created_at"] or "",
+            remote_id=row["remote_id"] or "",
         )

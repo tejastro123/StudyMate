@@ -52,26 +52,26 @@ _KEYRING_SERVICE = "StudyMate"
 _KEYRING_USERNAME = "anthropic_api_key"
 
 
-def get_api_key() -> str:
-    """Retrieve the Anthropic API key from the OS keyring."""
+def get_secret(key_name: str) -> str:
+    """Retrieve a generic secret from the OS keyring."""
     if _KEYRING_AVAILABLE:
         try:
-            return keyring.get_password(_KEYRING_SERVICE, _KEYRING_USERNAME) or ""
+            return keyring.get_password(_KEYRING_SERVICE, key_name) or ""
         except Exception as exc:
-            logger.warning("keyring read failed: %s", exc)
+            logger.warning("keyring read failed for %s: %s", key_name, exc)
     return ""
 
 
-def set_api_key(key: str) -> None:
-    """Store the Anthropic API key in the OS keyring."""
+def set_secret(key_name: str, value: str) -> None:
+    """Store a generic secret in the OS keyring."""
     if _KEYRING_AVAILABLE:
         try:
-            keyring.set_password(_KEYRING_SERVICE, _KEYRING_USERNAME, key)
-            logger.info("API key stored in OS keyring.")
+            keyring.set_password(_KEYRING_SERVICE, key_name, value)
+            logger.info("Secret %s stored in OS keyring.", key_name)
             return
         except Exception as exc:
-            logger.warning("keyring write failed: %s", exc)
-    logger.warning("keyring not available — API key NOT saved securely.")
+            logger.warning("keyring write failed for %s: %s", key_name, exc)
+    logger.warning("keyring not available — secret %s NOT saved securely.", key_name)
 
 
 def load_config() -> dict:
@@ -89,27 +89,29 @@ def load_config() -> dict:
             if key not in cfg:
                 cfg[key] = value
                 updated = True
-        if updated:
-            save_config(cfg)
-        # Inject api_key from keyring into the in-memory config dict
-        cfg["api_key"] = get_api_key()
+        # Inject secrets from keyring
+        cfg["api_key"] = get_secret(_KEYRING_USERNAME)
+        cfg["supabase_key"] = get_secret("supabase_key")
         return cfg
     except (json.JSONDecodeError, OSError) as exc:
         logger.error("Failed to load config: %s – using defaults", exc)
-        return {**DEFAULT_CONFIG, "api_key": get_api_key()}
+        return {**DEFAULT_CONFIG, "api_key": get_secret(_KEYRING_USERNAME), "supabase_key": get_secret("supabase_key")}
 
 
 def save_config(cfg: dict) -> None:
     """Persist non-secret config to config.json; api_key goes to keyring."""
     try:
         _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        # Strip api_key from the file — it lives in keyring
-        file_cfg = {k: v for k, v in cfg.items() if k != "api_key"}
+        # Strip secrets from the file
+        secrets = {"api_key", "supabase_key"}
+        file_cfg = {k: v for k, v in cfg.items() if k not in secrets}
         with open(_CONFIG_PATH, "w", encoding="utf-8") as fh:
             json.dump(file_cfg, fh, indent=2)
-        # Persist key separately
+        # Persist secrets separately
         if "api_key" in cfg:
-            set_api_key(cfg["api_key"])
+            set_secret(_KEYRING_USERNAME, cfg["api_key"])
+        if "supabase_key" in cfg:
+            set_secret("supabase_key", cfg["supabase_key"])
     except OSError as exc:
         logger.error("Failed to save config: %s", exc)
 
@@ -131,6 +133,14 @@ def main():
 
     # ── Config ─────────────────────────────────────────────────────────
     cfg = load_config()
+
+    # ── Cloud Sync ─────────────────────────────────────────────────────
+    from services.sync_service import sync_manager
+    sb_url = cfg.get("supabase_url")
+    sb_key = cfg.get("supabase_key")
+    if sb_url and sb_key:
+        sync_manager.configure(sb_url, sb_key)
+        sync_manager.try_restore_session()
 
     # ── Qt Application ─────────────────────────────────────────────────
     app = QApplication(sys.argv)

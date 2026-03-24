@@ -146,10 +146,15 @@ class FlipCardWidget(QFrame):
         )
         layout.addWidget(self._badge)
 
-        self._text_lbl = QLabel(front)
-        self._text_lbl.setWordWrap(True)
-        self._text_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._text_lbl.setFont(QFont("Segoe UI", 16))
+        from PyQt6.QtWidgets import QTextBrowser
+        self._text_lbl = QTextBrowser()
+        self._text_lbl.setOpenExternalLinks(True)
+        self._text_lbl.setFrameShape(QFrame.Shape.NoFrame)
+        self._text_lbl.setStyleSheet("background: transparent; font-size: 16px; font-family: 'Segoe UI';")
+        self._set_markdown(front)
+        # Prevent QTextBrowser from intercepting all clicks so the card can still flip:
+        self._text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        
         layout.addWidget(self._text_lbl, stretch=1)
 
         hint = QLabel("Click to flip ↻")
@@ -174,16 +179,31 @@ class FlipCardWidget(QFrame):
         self._anim_out.finished.connect(self._switch_face)
         self._anim_out.start()
 
+    def _set_markdown(self, text: str):
+        try:
+            import markdown
+            html = markdown.markdown(text, extensions=["fenced_code", "tables"])
+            # Wrap in minimal HTML to ensure centering and correct text colour
+            wrapped = f"""
+            <div style="text-align: center; color: #E0E0E0;">
+                {html}
+            </div>
+            """
+            self._text_lbl.setHtml(wrapped)
+        except Exception as exc:
+            logger.error("Markdown parse error: %s", exc)
+            self._text_lbl.setPlainText(text)
+
     def _switch_face(self):
         self._showing_front = not self._showing_front
         if self._showing_front:
-            self._text_lbl.setText(self._front_text)
+            self._set_markdown(self._front_text)
             self._badge.setText("QUESTION")
             self._badge.setStyleSheet(
                 "color: #6C63FF; font-size: 11px; font-weight: 700; letter-spacing: 2px;"
             )
         else:
-            self._text_lbl.setText(self._back_text)
+            self._set_markdown(self._back_text)
             self._badge.setText("ANSWER")
             self._badge.setStyleSheet(
                 "color: #50FA7B; font-size: 11px; font-weight: 700; letter-spacing: 2px;"
@@ -202,7 +222,7 @@ class FlipCardWidget(QFrame):
 
     def reset_to_front(self):
         self._showing_front = True
-        self._text_lbl.setText(self._front_text)
+        self._set_markdown(self._front_text)
         self._badge.setText("QUESTION")
         self._badge.setStyleSheet(
             "color: #6C63FF; font-size: 11px; font-weight: 700; letter-spacing: 2px;"
@@ -278,6 +298,17 @@ class StudyModeWidget(QWidget):
         btn_row.addWidget(self._hard_btn)
         layout.addLayout(btn_row)
 
+        # TTS listen button
+        tts_row = QHBoxLayout()
+        tts_row.addStretch()
+        self._listen_btn = QPushButton("🔊  Listen")
+        self._listen_btn.setObjectName("secondaryBtn")
+        self._listen_btn.setFixedWidth(120)
+        self._listen_btn.setToolTip("Read this card aloud")
+        self._listen_btn.clicked.connect(self._on_listen)
+        tts_row.addWidget(self._listen_btn)
+        layout.addLayout(tts_row)
+
     def _load_cards(self):
         self._cards = fc_logic.get_due_cards(self._deck_id)
         self._current_index = 0
@@ -333,6 +364,16 @@ class StudyModeWidget(QWidget):
         self._medium_btn.setEnabled(False)
         self._hard_btn.setEnabled(False)
 
+    def _on_listen(self):
+        """Speak the currently visible card side via TTS."""
+        from services.audio_service import speak
+        card_widget = self._card_widget
+        if card_widget._showing_front:
+            text = card_widget._front_text
+        else:
+            text = card_widget._back_text
+        speak(text)
+
 
 # ─────────────────────────────────────────────────── Main Page ──
 
@@ -386,6 +427,12 @@ class FlashcardPage(QWidget):
         add_btn = QPushButton("+ New Deck")
         add_btn.clicked.connect(self._on_add_deck)
         btn_row.addWidget(add_btn)
+
+        gen_pdf_btn = QPushButton("📄 Gen from PDF")
+        gen_pdf_btn.setObjectName("secondaryBtn")
+        gen_pdf_btn.clicked.connect(self._on_gen_from_pdf)
+        btn_row.addWidget(gen_pdf_btn)
+
         layout.addLayout(btn_row)
 
         self._deck_list = QListWidget()
@@ -486,6 +533,48 @@ class FlashcardPage(QWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             fc_logic.create_deck(dlg.deck_name, dlg.subject)
             self._load_decks()
+
+    def _on_gen_from_pdf(self):
+        from PyQt6.QtWidgets import QFileDialog, QInputDialog, QApplication
+        from PyQt6.QtGui import QCursor
+        from PyQt6.QtCore import Qt
+        import keyring
+        import modules.ai_assistant as ai_logic
+
+        api_key = keyring.get_password("StudyMate", "anthropic_api_key")
+        if not api_key:
+            QMessageBox.warning(self, "No API Key", "Please set your Anthropic API key in Settings first.")
+            return
+
+        path, _ = QFileDialog.getOpenFileName(self, "Select PDF to Generate Deck", "", "PDF Files (*.pdf)")
+        if not path:
+            return
+
+        deck_name, ok = QInputDialog.getText(self, "New Deck Name", "What should we name this AI-generated deck?", text="AI Deck")
+        if not ok or not deck_name.strip():
+            return
+
+        QApplication.setOverrideCursor(QCursor(Qt.CursorShape.WaitCursor))
+        try:
+            import os
+            QApplication.processEvents()
+            text = ai_logic.extract_text_from_pdf(path)
+            
+            # Request deck from Claude
+            cards = ai_logic.generate_deck_from_text(api_key, text, max_cards=15)
+            
+            # Create the deck and add cards
+            QApplication.restoreOverrideCursor()
+            deck_id = fc_logic.create_deck(deck_name.strip(), "AI Generated")
+            for c in cards:
+                fc_logic.add_card(deck_id, c["front"], c["back"])
+            
+            self._load_decks()
+            QMessageBox.information(self, "Success", f"Successfully generated {len(cards)} flashcards from PDF!")
+            
+        except Exception as e:
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "Generation Failed", str(e))
 
     def _on_rename_deck(self):
         if self._selected_deck_id is None:

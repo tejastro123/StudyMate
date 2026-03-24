@@ -87,3 +87,7 @@ def delete_event(event_id: int) -> None:
 
 def get_upcoming_events(window_minutes: int = 10) -> list[dict]:
     return [e.__dict__ for e in _svc.get_upcoming(window_minutes)]
+
+
+def export_ics(output_path: str) -> int:
+    return _svc.export_ics(output_path)

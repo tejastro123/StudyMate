@@ -54,3 +54,6 @@ def delete_card(card_id: int) -> None:
 
 def record_review(card_id: int, difficulty: str) -> None:
     _svc.record_review(card_id, difficulty)
+    import modules.stats as stats_logic
+    xp_map = {"easy": 1, "medium": 2, "hard": 3}
+    stats_logic.add_xp(xp_map.get(difficulty, 1))

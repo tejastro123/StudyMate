@@ -19,6 +19,7 @@ class Flashcard:
     due_date: str = ""        # ISO date string "YYYY-MM-DD"
     created_at: str = ""
     review_count: int = 0
+    remote_id: str = ""
 
     def __post_init__(self) -> None:
         if not self.front.strip():

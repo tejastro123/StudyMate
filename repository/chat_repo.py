@@ -14,17 +14,17 @@ class ChatRepository(BaseRepository[ChatSession]):
             "SELECT * FROM chat_sessions ORDER BY created_at DESC"
         ).fetchall()
         conn.close()
-        return [ChatSession(id=r["id"], title=r["title"] or "Chat", created_at=r["created_at"] or "") for r in rows]
+        return [self._row_to_session(r) for r in rows]
 
     def create_session(self, title: str = "New Chat") -> ChatSession:
         conn = self._conn()
         cur = conn.execute(
-            "INSERT INTO chat_sessions (title) VALUES (?)", (title,)
+            "INSERT INTO chat_sessions (title, is_dirty) VALUES (?, 1)", (title,)
         )
-        session_id = cur.lastrowid
+        s_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return ChatSession(id=session_id, title=title)
+        return ChatSession(id=s_id, title=title, is_dirty=1)
 
     def delete_session(self, session_id: int) -> None:
         conn = self._conn()
@@ -32,6 +32,26 @@ class ChatRepository(BaseRepository[ChatSession]):
         conn.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
         conn.commit()
         conn.close()
+
+    @staticmethod
+    def _row_to_session(row) -> ChatSession:
+        return ChatSession(
+            id=row["id"],
+            title=row["title"] or "New Chat",
+            created_at=row["created_at"] or "",
+            remote_id=row["remote_id"] or "",
+        )
+
+    @staticmethod
+    def _row_to_message(row) -> ChatMessage:
+        return ChatMessage(
+            id=row["id"],
+            session_id=row["session_id"],
+            role=row["role"],
+            content=row["content"],
+            timestamp=row["timestamp"] or "",
+            remote_id=row["remote_id"] or "",
+        )
 
     # ── Messages ─────────────────────────────────────────────────────────────
 
@@ -42,22 +62,15 @@ class ChatRepository(BaseRepository[ChatSession]):
             (session_id,),
         ).fetchall()
         conn.close()
-        return [
-            ChatMessage(
-                id=r["id"], session_id=r["session_id"],
-                role=r["role"], content=r["content"],
-                timestamp=r["timestamp"] or "",
-            )
-            for r in rows
-        ]
+        return [self._row_to_message(r) for r in rows]
 
-    def save_message(self, session_id: int, role: str, content: str) -> ChatMessage:
+    def add_message(self, session_id: int, role: str, content: str) -> ChatMessage:
         conn = self._conn()
         cur = conn.execute(
-            "INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)",
+            "INSERT INTO chat_messages (session_id, role, content, is_dirty) VALUES (?, ?, ?, 1)",
             (session_id, role, content),
         )
-        msg_id = cur.lastrowid
+        m_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return ChatMessage(id=msg_id, session_id=session_id, role=role, content=content)
+        return ChatMessage(id=m_id, session_id=session_id, role=role, content=content, is_dirty=1)

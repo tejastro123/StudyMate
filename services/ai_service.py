@@ -107,3 +107,63 @@ class AIService:
         text = re.sub(r"^# (.+)$", r"<h1>\1</h1>", text, flags=re.MULTILINE)
         text = text.replace("\n", "<br>")
         return text
+
+    # ── Document Parsing & Generation ──────────────────────────────────────────
+
+    @staticmethod
+    def extract_text_from_pdf(pdf_path: str) -> str:
+        """Extract all raw text from a local PDF file using PyMuPDF."""
+        import fitz  # PyMuPDF
+        text_blocks = []
+        try:
+            with fitz.open(pdf_path) as doc:
+                for page in doc:
+                    text_blocks.append(page.get_text())
+        except Exception as e:
+            logger.error(f"Failed to parse PDF {pdf_path}: {e}")
+            raise ValueError(f"Could not read PDF file: {e}")
+        return "\n".join(text_blocks)
+
+    def generate_deck_from_text(self, api_key: str, text: str, max_cards: int = 15) -> list[dict[str, str]]:
+        """
+        Send document text to Claude and ask it to generate a Quiz/Flashcard deck.
+        Returns a list of dictionaries with 'front' and 'back' keys.
+        """
+        import anthropic
+        import json
+
+        gen_prompt = (
+            f"You are an expert tutor. Please read the provided document fragment and extract up to {max_cards} "
+            "key-value flashcards that cover the most important concepts.\n"
+            "You MUST reply with ONLY a raw, valid JSON array of objects. Do not include markdown code blocks (like ```json), "
+            "do not include introductory or concluding text, just the raw JSON array. "
+            "Each object must have exactly two string keys: 'front' and 'back'.\n"
+            "Example: [{\"front\": \"What is mitochondria?\", \"back\": \"Powerhouse of the cell\"}]"
+        )
+
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=2048,
+            system=gen_prompt,
+            messages=[{"role": "user", "content": f"Document text:\n\n{text[:40000]}"}], # truncate if too huge
+        )
+
+        reply = response.content[0].text.strip()
+        
+        # Strip potential markdown formatting if Claude disobeys
+        if reply.startswith("```json"):
+            reply = reply[7:]
+        if reply.startswith("```"):
+            reply = reply[3:]
+        if reply.endswith("```"):
+            reply = reply[:-3]
+            
+        try:
+            cards = json.loads(reply.strip())
+            if not isinstance(cards, list):
+                raise ValueError("Claude didn't return a JSON array.")
+            return cards
+        except Exception as e:
+            logger.error(f"Failed to parse Claude deck response: {e}\nResponse was:\n{reply}")
+            raise ValueError("AI failed to format the flashcards correctly. Please try again.")

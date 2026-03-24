@@ -340,10 +340,16 @@ class TimetablePage(QWidget):
         add_btn.clicked.connect(self._on_add_event)
         hdr.addWidget(add_btn)
 
-        export_btn = QPushButton("📸 Export PNG")
-        export_btn.setObjectName("secondaryBtn")
-        export_btn.clicked.connect(self._on_export_png)
-        hdr.addWidget(export_btn)
+        export_png_btn = QPushButton("📸 Export PNG")
+        export_png_btn.setObjectName("secondaryBtn")
+        export_png_btn.clicked.connect(self._on_export_png)
+        hdr.addWidget(export_png_btn)
+
+        export_ics_btn = QPushButton("📅 Export ICS")
+        export_ics_btn.setObjectName("secondaryBtn")
+        export_ics_btn.clicked.connect(self._on_export_ics)
+        hdr.addWidget(export_ics_btn)
+
         left_layout.addLayout(hdr)
 
         self._grid = WeeklyGrid()
@@ -472,6 +478,19 @@ class TimetablePage(QWidget):
         if path:
             pixmap.save(path, "PNG")
             QMessageBox.information(self, "Exported", f"Saved to:\n{path}")
+
+    def _on_export_ics(self):
+        from PyQt6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Calendar", "studymate_timetable.ics", "iCalendar Files (*.ics)"
+        )
+        if path:
+            try:
+                count = tt_logic.export_ics(path)
+                QMessageBox.information(self, "Export Successful", f"Exported {count} events to:\n{path}")
+            except Exception as exc:
+                logger.error("Failed to export ICS: %s", exc)
+                QMessageBox.critical(self, "Export Failed", f"Could not export calendar:\n{exc}")
 
     def _check_notifications(self):
         """Fire a system notification for events starting in ~5 minutes."""

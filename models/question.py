@@ -20,6 +20,7 @@ class Question:
     option_d: str = ""
     explanation: str = ""
     created_at: str = ""
+    remote_id: str = ""
 
     def __post_init__(self) -> None:
         if not self.question_text.strip():

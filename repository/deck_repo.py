@@ -16,7 +16,7 @@ class DeckRepository(BaseRepository[Deck]):
         rows = conn.execute(
             """
             SELECT
-                d.id, d.name, d.subject, d.created_at,
+                d.id, d.name, d.subject, d.created_at, d.remote_id,
                 COUNT(f.id)                                          AS total_cards,
                 SUM(CASE WHEN f.due_date <= ? THEN 1 ELSE 0 END)    AS due_today,
                 SUM(CASE WHEN f.ease_factor >= 2.5
@@ -37,7 +37,7 @@ class DeckRepository(BaseRepository[Deck]):
         row = conn.execute(
             """
             SELECT
-                d.id, d.name, d.subject, d.created_at,
+                d.id, d.name, d.subject, d.created_at, d.remote_id,
                 COUNT(f.id)                                          AS total_cards,
                 SUM(CASE WHEN f.due_date <= ? THEN 1 ELSE 0 END)    AS due_today,
                 SUM(CASE WHEN f.ease_factor >= 2.5
@@ -57,18 +57,18 @@ class DeckRepository(BaseRepository[Deck]):
     def create(self, name: str, subject: str = "") -> Deck:
         conn = self._conn()
         cur = conn.execute(
-            "INSERT INTO decks (name, subject) VALUES (?, ?)", (name, subject)
+            "INSERT INTO decks (name, subject, is_dirty) VALUES (?, ?, 1)", (name, subject)
         )
         deck_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return Deck(id=deck_id, name=name, subject=subject)
+        return Deck(id=deck_id, name=name, subject=subject, is_dirty=1)
 
     def rename(self, deck_id: int, new_name: str) -> None:
         if not new_name.strip():
             raise ValueError("Deck name cannot be empty.")
         conn = self._conn()
-        conn.execute("UPDATE decks SET name = ? WHERE id = ?", (new_name, deck_id))
+        conn.execute("UPDATE decks SET name = ?, is_dirty = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (new_name, deck_id))
         conn.commit()
         conn.close()
 
@@ -89,6 +89,7 @@ class DeckRepository(BaseRepository[Deck]):
             name=row["name"],
             subject=row["subject"] or "",
             created_at=row["created_at"] or "",
+            remote_id=row["remote_id"] or "",
             total_cards=row["total_cards"] or 0,
             due_today=row["due_today"] or 0,
             mastered=row["mastered"] or 0,

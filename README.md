@@ -1,139 +1,97 @@
-# StudyMate 📚
+# StudyMate 📚 v1.1.0
 
-A **production-ready student productivity desktop application** built with Python, PyQt6, and SQLite — featuring flashcards, quizzes, a weekly timetable, Pomodoro focus timer, and an AI study assistant powered by Anthropic Claude.
-
----
-
-## Features
-
-| Module | Highlights |
-| 🏠 **Dashboard** | Live stats cards, motivational quote, recent activity, quick-access buttons |
-| 📇 **Flashcards** | Decks + cards, flip animation, spaced-repetition (Easy/Medium/Hard) |
-| 📝 **Quizzes** | MCQ / True-False / Short Answer, timed mode, CSV import, AI generation, bar chart history |
-| 📅 **Timetable** | Weekly grid (Mon–Sun, 6 AM–10 PM), colour-coded events, recurring events, PNG export, plyer notifications |
-| ⏱️ **Focus Timer** | Pomodoro & custom mode, custom QPainter circular arc, fullscreen mode (hides taskbar), daily focus chart |
-| 🤖 **AI Assistant** | Claude-powered chat, quick actions, markdown rendering, session history |
-| ⚙️ **Settings** | API key management, theme toggle, Pomodoro defaults, ZIP backup/restore, clear all data |
+A **premium, modular, and cloud-synced study platform** for students. StudyMate transforms from a simple productivity tool into an industry-scale application featuring **AI Document Analysis**, **Multi-Device Synchronization**, **Voice Control**, and **Gamified Learning**.
 
 ---
 
-## Requirements
+## 🚀 Key Features
 
-- **Python 3.11+**
-- **Windows 10 / 11**
+| Module | New Industry Features |
+| :--- | :--- |
+| ☁️ **Cloud Sync** | **Offline-First** syncing via Supabase. Data is stored locally in SQLite and synced in the background. |
+| 📄 **AI PDF Engine** | Drag-and-drop PDFs (syllabi, readings) to instantly generate **AI Flashcard Decks** or Quizzes. |
+| 🎮 **Gamification** | GitHub-style **Study Heatmap**, XP system, and Study Streaks track your daily improvement. |
+| 🔊 **Audio Review** | **Text-to-Speech (TTS)** for hands-free flashcard study and **Speech-to-Text (STT)** for AI Assistant control. |
+| 🤖 **AI Assistant** | Advanced Claude-powered conversational study buddy with full Markdown & PDF context. |
+| ⏱️ **Focus Timer** | Integrated **Ambient Soundscapes** (Lo-Fi, Rain, Cafe) and fullscreen distraction-free mode. |
+| 📅 **Calendar & ICS** | Weekly planner with **ICS export** support for Google Calendar and Outlook. |
 
 ---
 
-## Setup
+## 🛠️ Technology Stack
 
-### 1. Clone / Download
+- **Core**: Python 3.14+, PyQt6
+- **Database**: SQLite (Local) + Supabase (Cloud Sync)
+- **Migrations**: Alembic
+- **AI**: Anthropic Claude API (messages, document processing)
+- **Security**: OS Keyring (Windows Credential Manager) for API Keys and Session Tokens
+- **Audio**: `pyttsx3` (TTS), `SpeechRecognition` (STT), `PyQt6-QtMultimedia` (Ambient)
+- **PDF**: `PyMuPDF` (Fitz)
+
+---
+
+## 🏁 Setup & Installation
+
+### 1. Prerequisites
+
+- **Python 3.12+**
+- **Microsoft C++ Build Tools** (Required for Speech Recognition/STT libraries)
+
+### 2. Installation
 
 ```bash
-git clone <your-repo>
-cd StudyMate/studymate
-```
-
-### 2. Create a virtual environment (recommended)
-
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
+git clone https://github.com/tejastro123/StudyMate.git
+cd StudyMate
 pip install -r requirements.txt
 ```
 
-### 4. Run
+### 3. Run
 
 ```bash
 python main.py
 ```
 
-The database is automatically created at:
+---
+
+## ⚙️ Configuration (Cloud Sync & AI)
+
+1. **AI Assistant**: Get an API key from [Anthropic](https://console.anthropic.com) and add it in **Settings**.
+2. **Cloud Sync**: Create a free project on [Supabase](https://supabase.com).
+   - Enable **Auth** (Email/Password).
+   - Enable **Database** (PostgreSQL/PostgREST).
+   - Provide your Project URL and Anon Key in **Settings -> Cloud Sync**.
+   - Your credentials are saved **securely** in the Windows Keyring.
+
+---
+
+## 📂 Project Architecture
+
+StudyMate uses a **Modular Service-Based Architecture** (Shim Layer) for scalability:
+
+- `repository/`: Data layer (SQLite operations, sync tracking).
+- `services/`: Logic layer (AI processing, Supabase Sync, Audio Manager).
+- `models/`: Domain dataclasses and validation.
+- `ui/`: PyQt6 presentation layer.
+- `database/`: Schema definitions and Alembic migrations.
+
+---
+
+## 📦 Distribution & Build
+
+StudyMate uses **GitHub Actions** to automate production builds. Creating a Git tag (e.g., `v1.1.0`) triggers:
+
+1. **PyInstaller** bundling (Portable EXE).
+2. **Inno Setup** compilation (Standalone Windows Installer).
+3. Automatic **GitHub Release** creation.
+
+To build manually:
 
 ```bash
-%APPDATA%\StudyMate\studymate.db
+pyinstaller StudyMate.spec
 ```
 
 ---
 
-## AI Assistant Setup
+## 📜 License
 
-1. Sign up at [console.anthropic.com](https://console.anthropic.com) and create an API key.
-2. Open StudyMate → **Settings** → paste your key into the **API Key** field → click **Save**.
-
-Your key is stored locally in `%APPDATA%\StudyMate\config.json` and is never sent anywhere except the Anthropic API.
-
----
-
-## Project Structure
-
-```bash
-studymate/
-├── main.py                 # Entry point
-├── requirements.txt
-├── README.md
-├── assets/icons/           # Emoji fallbacks used — no external icons needed
-├── database/
-│   ├── __init__.py
-│   └── db.py               # SQLite manager (init, migrations, get_connection)
-├── modules/
-│   ├── flashcards.py       # Deck & card CRUD + spaced repetition
-│   ├── quiz.py             # Quiz CRUD, CSV import, AI generation
-│   ├── timetable.py        # Event CRUD + notification helpers
-│   ├── focus_timer.py      # Session recording + daily stats
-│   └── ai_assistant.py     # Claude API, session/message persistence, markdown→HTML
-├── ui/
-│   ├── main_window.py      # Sidebar + QStackedWidget shell
-│   ├── dashboard_ui.py
-│   ├── flashcard_ui.py     # Flip card animation + study mode
-│   ├── quiz_ui.py          # Quiz runner + score screen + chart
-│   ├── timetable_ui.py     # Weekly grid + slot-click event creation
-│   ├── timer_ui.py         # QPainter circular timer + fullscreen overlay
-│   ├── assistant_ui.py     # Chat bubbles + background API worker
-│   └── settings_ui.py      # Config, theme, data management
-└── styles/
-    └── theme.qss           # Global dark theme (+ light mode override)
-```
-
----
-
-## Packaging (Windows EXE)
-
-```bash
-pip install pyinstaller
-pyinstaller --onefile --windowed --name StudyMate main.py
-```
-
-The resulting `StudyMate.exe` will be in the `dist/` folder.
-
-> **Note:** You may need to add `--add-data "styles;styles"` to include the QSS file, and similarly for any additional assets.
-
----
-
-## Data Backup & Restore
-
-Go to **Settings → Data Management**:
-
-- **Export Backup** — saves `studymate.db` + `config.json` as a `.zip` archive.
-- **Import Backup** — restores from a `.zip` archive (restart required).
-
----
-
-## Tech Stack
-
-| Library | Version | Purpose |
-| PyQt6 | ≥ 6.6 | UI framework |
-| anthropic | ≥ 0.25 | Claude AI API |
-| plyer | ≥ 2.1 | Windows notifications |
-| matplotlib | ≥ 3.8 | Embedded bar charts |
-| sqlite3 | built-in | Local database |
-
----
-
-## License
-
-MIT — free to use, modify, and distribute.
+MIT © 2026 StudyMate Team.

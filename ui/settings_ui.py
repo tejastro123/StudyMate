@@ -61,6 +61,7 @@ class SettingsPage(QScrollArea):
         layout.addWidget(title)
 
         layout.addWidget(self._build_api_section())
+        layout.addWidget(self._build_cloud_section()) # NEW
         layout.addWidget(self._build_theme_section())
         layout.addWidget(self._build_pomodoro_section())
         layout.addWidget(self._build_notifications_section())
@@ -195,6 +196,50 @@ class SettingsPage(QScrollArea):
         lay.addWidget(clear_btn)
         return frame
 
+    def _build_cloud_section(self) -> QFrame:
+        """Supabase Cloud Sync configuration."""
+        frame, lay = self._card("☁️  Cloud Sync (Supabase)")
+        
+        from services.sync_service import sync_manager
+        
+        lbl = QLabel("Sync your study data across devices using Supabase.")
+        lbl.setObjectName("mutedLabel")
+        lay.addWidget(lbl)
+
+        # URL and Key
+        url_row = QHBoxLayout()
+        url_row.addWidget(QLabel("Project URL:"))
+        self._sb_url = QLineEdit(self._cfg.get("supabase_url", ""))
+        self._sb_url.setPlaceholderText("https://xyz.supabase.co")
+        url_row.addWidget(self._sb_url)
+        lay.addLayout(url_row)
+
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("Anon Key:   "))
+        self._sb_key = QLineEdit(self._cfg.get("supabase_key", ""))
+        self._sb_key.setEchoMode(QLineEdit.EchoMode.Password)
+        key_row.addWidget(self._sb_key)
+        lay.addLayout(key_row)
+
+        # Auth
+        self._auth_status = QLabel("Status: Not Logged In")
+        if sync_manager.is_logged_in():
+             self._auth_status.setText(f"Status: Logged In as {sync_manager._user_id[:8]}...")
+        lay.addWidget(self._auth_status)
+
+        btn_row = QHBoxLayout()
+        self._login_btn = QPushButton("🔑 Login / Connect")
+        self._login_btn.clicked.connect(self._on_cloud_login)
+        btn_row.addWidget(self._login_btn)
+
+        self._sync_now_btn = QPushButton("🔄 Sync Now")
+        self._sync_now_btn.setEnabled(sync_manager.is_logged_in())
+        self._sync_now_btn.clicked.connect(self._on_sync_now)
+        btn_row.addWidget(self._sync_now_btn)
+        
+        lay.addLayout(btn_row)
+        return frame
+
     def _build_about_section(self) -> QFrame:
         frame, lay = self._card("ℹ️ About")
         lay.addWidget(QLabel("StudyMate v1.0.0"))
@@ -264,6 +309,72 @@ class SettingsPage(QScrollArea):
             )
         except Exception as exc:
             QMessageBox.critical(self, "Import Error", str(exc))
+
+    def _on_cloud_login(self):
+        url = self._sb_url.text().strip()
+        key = self._sb_key.text().strip()
+        if not url or not key:
+            QMessageBox.warning(self, "Error", "Please enter both Supabase URL and Key.")
+            return
+        
+        from services.sync_service import sync_manager
+        sync_manager.configure(url, key)
+        
+        import login_dialog # I might need to create a small dialog for email/pass
+        # For now, let's assume I create a simple input
+        from PyQt6.QtWidgets import QInputDialog
+        email, ok1 = QInputDialog.getText(self, "Login", "Email:")
+        if not ok1 or not email: return
+        password, ok2 = QInputDialog.getText(self, "Login", "Password:", QLineEdit.EchoMode.Password)
+        if not ok2 or not password: return
+        
+        if sync_manager.login(email, password):
+            self._cfg["supabase_url"] = url
+            self._cfg["supabase_key"] = key
+            if self._save_config: self._save_config(self._cfg)
+            self._auth_status.setText(f"Status: Logged In ({email})")
+            self._sync_now_btn.setEnabled(True)
+            QMessageBox.information(self, "Success", "Logged in to Supabase!")
+        else:
+            QMessageBox.critical(self, "Error", "Login failed. Check credentials/URL.")
+
+    def _on_sync_now(self):
+        from services.sync_service import sync_manager
+        # We need access to the repositories to sync them
+        # In a real app, these are usually available via the app instance or a DI container
+        # For StudyMate, we can use the MainWindow's repos if we can find them
+        # Or just instantiate them temporarily
+        from database.db import get_connection
+        from repository.deck_repo import DeckRepository
+        from repository.flashcard_repo import FlashcardRepository
+        from repository.quiz_repo import QuizRepository
+        from repository.timetable_repo import TimetableRepository
+        from repository.focus_repo import FocusRepository
+        from repository.chat_repo import ChatRepository
+        from repository.stats_repo import StatsRepository
+        
+        cf = get_connection
+        repos = {
+            "decks": DeckRepository(cf),
+            "flashcards": FlashcardRepository(cf),
+            "quizzes": QuizRepository(cf),
+            "timetable_events": TimetableRepository(cf),
+            "focus_sessions": FocusRepository(cf),
+            "chat_sessions": ChatRepository(cf),
+            "study_activity": StatsRepository(cf),
+        }
+        
+        self._sync_now_btn.setEnabled(False)
+        self._sync_now_btn.setText("⏳ Syncing...")
+        
+        try:
+            sync_manager.sync_all(repos)
+            QMessageBox.information(self, "Sync Complete", "Your data is now in sync with the cloud.")
+        except Exception as e:
+            QMessageBox.critical(self, "Sync Failed", f"An error occurred: {e}")
+        finally:
+            self._sync_now_btn.setEnabled(True)
+            self._sync_now_btn.setText("🔄 Sync Now")
 
     def _on_clear_data(self):
         reply = QMessageBox.warning(

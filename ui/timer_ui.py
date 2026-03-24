@@ -319,6 +319,31 @@ class TimerPage(QWidget):
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
+        # ── Ambient audio ────────────────────────────────────────────
+        audio_row = QHBoxLayout()
+        audio_row.addWidget(QLabel("🎧 Ambient Sound:"))
+        self._sound_combo = QComboBox()
+        self._sound_combo.addItems(["None", "Lo-Fi Beats", "Rain", "Cafe"])
+        self._sound_combo.currentTextChanged.connect(self._on_sound_changed)
+        audio_row.addWidget(self._sound_combo)
+        audio_row.addStretch()
+        
+        self._player = None
+        try:
+            from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+            self._player = QMediaPlayer()
+            self._audio_output = QAudioOutput()
+            self._audio_output.setVolume(0.5)
+            self._player.setAudioOutput(self._audio_output)
+            # Infinite looping
+            self._player.setLoops(QMediaPlayer.Loops.Infinite)
+        except ImportError:
+            logger.warning("PyQt6.QtMultimedia not installed. Sounds disabled.")
+            self._sound_combo.setEnabled(False)
+            self._sound_combo.setToolTip("PyQt6-QtMultimedia library missing")
+            
+        layout.addLayout(audio_row)
+
         # ── Stats + chart ────────────────────────────────────────────
         stats_row = QHBoxLayout()
         self._today_lbl = QLabel("Focus today: 0m")
@@ -358,6 +383,42 @@ class TimerPage(QWidget):
         self._session_type = "pomodoro" if mode == "Pomodoro" else "custom"
         self._reset_display()
 
+    def _on_sound_changed(self, sound_mode: str):
+        if not self._player:
+            return
+        
+        from PyQt6.QtCore import QUrl
+        import os
+        
+        self._player.stop()
+        if sound_mode == "None":
+            return
+            
+        file_map = {
+            "Lo-Fi Beats": "lofi.mp3",
+            "Rain": "rain.mp3",
+            "Cafe": "cafe.mp3"
+        }
+        filename = file_map.get(sound_mode)
+        if not filename:
+            return
+            
+        path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", filename))
+        if os.path.exists(path):
+            self._player.setSource(QUrl.fromLocalFile(path))
+        else:
+            fallbacks = {
+                "Lo-Fi Beats": "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
+                "Rain": "https://cdn.pixabay.com/audio/2021/08/09/audio_dc39bde80a.mp3",
+                "Cafe": "https://cdn.pixabay.com/audio/2022/03/15/audio_10e057da5e.mp3"
+            }
+            url = fallbacks.get(sound_mode)
+            if url:
+                self._player.setSource(QUrl(url))
+                
+        if self._running:
+            self._player.play()
+
     def _on_start(self):
         if self._running:
             return
@@ -377,6 +438,9 @@ class TimerPage(QWidget):
         self._circle.set_phase("work")
         self._circle.set_time(self._remaining, self._total_seconds)
         self._update_phase_label()
+        
+        if self._player and self._sound_combo.currentText() != "None":
+            self._player.play()
 
         self._start_btn.setEnabled(False)
         self._pause_btn.setEnabled(True)
@@ -387,13 +451,19 @@ class TimerPage(QWidget):
         if self._timer.isActive():
             self._timer.stop()
             self._pause_btn.setText("▶  Resume")
+            if self._player:
+                self._player.pause()
         else:
             self._timer.start(1000)
             self._pause_btn.setText("⏸  Pause")
+            if self._player and self._sound_combo.currentText() != "None":
+                self._player.play()
 
     def _on_stop(self):
         """Stop the current session early and record it as incomplete."""
         self._timer.stop()
+        if self._player:
+            self._player.stop()
         if self._running and self._current_phase == "work" and self._work_start_epoch > 0:
             import time as _time
             elapsed_secs = int(_time.time() - self._work_start_epoch)
@@ -412,6 +482,8 @@ class TimerPage(QWidget):
             self._fullscreen_widget.update_time(self._remaining, self._total_seconds)
         if self._remaining <= 0:
             self._timer.stop()
+            if self._player:
+                self._player.stop()
             self._on_phase_complete()
 
     def _on_phase_complete(self):

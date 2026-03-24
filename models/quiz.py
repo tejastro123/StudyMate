@@ -10,6 +10,7 @@ class Quiz:
     title: str
     subject: str = ""
     created_at: str = ""
+    remote_id: str = ""
 
     # Populated by JOIN
     question_count: int = 0

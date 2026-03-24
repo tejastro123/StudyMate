@@ -441,9 +441,40 @@ class ScoreScreen(QWidget):
         scroll.setWidget(inner)
         layout.addWidget(scroll, stretch=1)
 
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        
+        save_mistakes_btn = QPushButton("💾 Save Mistakes to Flashcards")
+        save_mistakes_btn.setObjectName("secondaryBtn")
+        save_mistakes_btn.clicked.connect(lambda: self._save_mistakes(results))
+        btn_row.addWidget(save_mistakes_btn)
+        
         done_btn = QPushButton("← Back to Quizzes")
         done_btn.clicked.connect(self.restart.emit)
-        layout.addWidget(done_btn)
+        btn_row.addWidget(done_btn)
+        
+        layout.addLayout(btn_row)
+
+    def _save_mistakes(self, results: list[dict]):
+        mistakes = [r for r in results if not r["is_correct"]]
+        if not mistakes:
+            QMessageBox.information(self, "No Mistakes", "You got a perfect score! Nothing to save.")
+            return
+            
+        import modules.flashcards as fc_logic
+        from datetime import datetime
+        
+        deck_name = f"Missed Quiz Questions ({datetime.now().strftime('%b %d, %H:%M')})"
+        deck_id = fc_logic.create_deck(deck_name)
+        
+        for m in mistakes:
+            front = m["question"]
+            back = f"Correct Answer: {m['correct']}\n"
+            if m.get("explanation"):
+                back += f"\nExplanation: {m['explanation']}"
+            fc_logic.add_card(deck_id, front, back)
+            
+        QMessageBox.information(self, "Saved", f"Created flashcard deck:\n'{deck_name}'\nwith {len(mistakes)} missed question(s).")
 
 
 # ──────────────────────────────────────────────── History Chart ──

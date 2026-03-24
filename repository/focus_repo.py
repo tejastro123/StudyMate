@@ -7,31 +7,23 @@ from models.focus_session import FocusSession, DailyFocusStat
 
 class FocusRepository(BaseRepository[FocusSession]):
 
-    def record(
-        self,
-        subject: str,
-        duration_minutes: int,
-        session_type: str,
-        completed: bool = True,
+    def record_session(
+        self, subject: str, duration_minutes: int, session_type: str, completed: bool = True
     ) -> FocusSession:
         conn = self._conn()
         cur = conn.execute(
             """
-            INSERT INTO focus_sessions
-                (subject, duration_minutes, session_type, completed)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO focus_sessions (subject, duration_minutes, session_type, completed, is_dirty)
+            VALUES (?, ?, ?, ?, 1)
             """,
             (subject, duration_minutes, session_type, int(completed)),
         )
-        session_id = cur.lastrowid
+        s_id = cur.lastrowid
         conn.commit()
         conn.close()
         return FocusSession(
-            id=session_id,
-            subject=subject,
-            duration_minutes=duration_minutes,
-            session_type=session_type,
-            completed=completed,
+            id=s_id, subject=subject, duration_minutes=duration_minutes,
+            session_type=session_type, completed=completed, is_dirty=1
         )
 
     def get_today_total_minutes(self) -> int:

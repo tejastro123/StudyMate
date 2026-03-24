@@ -53,6 +53,8 @@ def delete_question(question_id: int) -> None:
 
 def record_attempt(quiz_id: int, score: int, total: int, time_taken: int) -> None:
     _svc.record_attempt(quiz_id, score, total, time_taken)
+    import modules.stats as stats_logic
+    stats_logic.add_xp(score * 5)
 
 def get_all_attempts_for_chart() -> list[dict]:
     return _svc.get_attempts_for_chart()

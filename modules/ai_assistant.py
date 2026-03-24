@@ -50,3 +50,9 @@ def send_message(
 
 def markdown_to_html(text: str) -> str:
     return AIService.markdown_to_html(text)
+
+def extract_text_from_pdf(pdf_path: str) -> str:
+    return AIService.extract_text_from_pdf(pdf_path)
+
+def generate_deck_from_text(api_key: str, text: str, max_cards: int = 15) -> list[dict[str, str]]:
+    return _svc.generate_deck_from_text(api_key, text, max_cards)

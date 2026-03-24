@@ -13,7 +13,7 @@ class QuizRepository(BaseRepository[Quiz]):
         conn = self._conn()
         rows = conn.execute(
             """
-            SELECT q.id, q.title, q.subject, q.created_at,
+            SELECT q.id, q.title, q.subject, q.created_at, q.remote_id,
                    COUNT(qu.id) AS question_count
             FROM quizzes q
             LEFT JOIN questions qu ON qu.quiz_id = q.id
@@ -28,7 +28,7 @@ class QuizRepository(BaseRepository[Quiz]):
         conn = self._conn()
         row = conn.execute(
             """
-            SELECT q.id, q.title, q.subject, q.created_at,
+            SELECT q.id, q.title, q.subject, q.created_at, q.remote_id,
                    COUNT(qu.id) AS question_count
             FROM quizzes q
             LEFT JOIN questions qu ON qu.quiz_id = q.id
@@ -43,12 +43,12 @@ class QuizRepository(BaseRepository[Quiz]):
     def create(self, title: str, subject: str = "") -> Quiz:
         conn = self._conn()
         cur = conn.execute(
-            "INSERT INTO quizzes (title, subject) VALUES (?, ?)", (title, subject)
+            "INSERT INTO quizzes (title, subject, is_dirty) VALUES (?, ?, 1)", (title, subject)
         )
         quiz_id = cur.lastrowid
         conn.commit()
         conn.close()
-        return Quiz(id=quiz_id, title=title, subject=subject)
+        return Quiz(id=quiz_id, title=title, subject=subject, is_dirty=1)
 
     def delete(self, quiz_id: int) -> None:
         """Delete quiz, its questions, and all attempt records."""
@@ -114,8 +114,8 @@ class QuizRepository(BaseRepository[Quiz]):
             """
             INSERT INTO questions
                 (quiz_id, question_text, q_type, correct_answer,
-                 option_a, option_b, option_c, option_d, explanation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 option_a, option_b, option_c, option_d, explanation, is_dirty)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
             (quiz_id, question_text, q_type, correct_answer,
              option_a, option_b, option_c, option_d, explanation),
@@ -128,7 +128,7 @@ class QuizRepository(BaseRepository[Quiz]):
             q_type=q_type, correct_answer=correct_answer,
             option_a=option_a, option_b=option_b,
             option_c=option_c, option_d=option_d,
-            explanation=explanation,
+            explanation=explanation, is_dirty=1
         )
 
     def delete_question(self, question_id: int) -> None:
@@ -146,6 +146,7 @@ class QuizRepository(BaseRepository[Quiz]):
             title=row["title"],
             subject=row["subject"] or "",
             created_at=row["created_at"] or "",
+            remote_id=row["remote_id"] or "",
             question_count=row["question_count"] or 0,
         )
 
@@ -163,4 +164,5 @@ class QuizRepository(BaseRepository[Quiz]):
             option_d=row["option_d"] or "",
             explanation=row["explanation"] or "",
             created_at=row["created_at"] or "",
+            remote_id=row["remote_id"] or "",
         )
