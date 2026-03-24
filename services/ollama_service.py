@@ -56,35 +56,23 @@ class OllamaService:
                 json=payload,
                 timeout=self.timeout
             )
+            if response.status_code == 404:
+                 raise Exception(f"Model '{model}' not found in Ollama. Please click 'Pull Model' in Settings.")
             response.raise_for_status()
             result = response.json()
             return result.get("message", {}).get("content", "")
         except Exception as e:
             logger.error(f"Ollama chat failed: {e}")
-            raise Exception(f"Local AI Error: {e}")
+            raise Exception(str(e))
 
     def generate(self, model: str, prompt: str, system: Optional[str] = None) -> str:
-        """Single-turn generation."""
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False
-        }
+        """Single-turn generation using the /api/chat endpoint for better compatibility."""
+        messages = []
         if system:
-            payload["system"] = system
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
 
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/generate",
-                json=payload,
-                timeout=self.timeout
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("response", "")
-        except Exception as e:
-            logger.error(f"Ollama generate failed: {e}")
-            raise Exception(f"Local AI Error: {e}")
+        return self.chat(model, messages)
 
     def pull_model(self, model: str):
         """
